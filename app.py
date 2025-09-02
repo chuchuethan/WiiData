@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+# by Ethan Chu
+
 def main():
 
     st.title(':rainbow[**:sparkles: Nintendo Video Game Sales :sparkles:**]')
@@ -305,4 +307,5 @@ accuracies''')
 
 
 if __name__ == '__main__':
+
     main()
