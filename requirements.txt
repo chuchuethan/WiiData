@@ -1,0 +1,8 @@
+Requirements to run this app:
+- pandas
+- Matplotlib
+- Seaborn
+- NumPy
+- scipy.stats
+- sci-kit learn
+- streamlit
