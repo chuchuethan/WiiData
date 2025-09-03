@@ -1,7 +1,7 @@
 pandas
 streamlit
 numpy
-matplotlib
+matplotlib.pyplot
 seaborn
 scipy.stats
 sci-kit learn
