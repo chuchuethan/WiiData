@@ -13,6 +13,7 @@ import streamlit as st
 
 df = pd.read_csv('video_games_sales.csv')
 df = df.dropna()
+df = df.drop(columns = ['name'])
 
 df = df[df['publisher'] == 'Nintendo']
 
@@ -70,7 +71,7 @@ for index, column in enumerate(ct.get_feature_names_out()):
 trials = []
 
 X = df.iloc[ : , 0:28]
-X = pd.concat([X, df.iloc[ : , 38 : ]], axis = 1)
+X = pd.concat([X, df.iloc[ : , 37 : ]], axis = 1)
 y = df['ordinalencoder__risk']
 
 for _ in range(100):
@@ -100,11 +101,10 @@ def title():
     st.markdown(':stars: :rainbow[Let\'s read in our dataset first] :stars:')
     st.code('''df = pd.read_csv('video_games_sales.csv')
 df = df.dropna()
+df = df.drop(columns = ['name'])
 
 df = df[df['publisher'] == 'Nintendo']
 ''')
-    
-    st.dataframe(df)
 
     st.divider()
 
