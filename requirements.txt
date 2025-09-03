@@ -3,5 +3,5 @@ streamlit
 numpy
 matplotlib
 seaborn
-scipy.stats
+scipy
 sci-kit-learn
