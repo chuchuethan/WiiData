@@ -1,10 +1,101 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from scipy.stats import t
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.compose import make_column_transformer
 import streamlit as st
 
-# by Ethan Chu
+# by Ethan Chu!
 
-def main():
+df = pd.read_csv('video_games_sales.csv')
+df = df.dropna()
 
+df = df[df['publisher'] == 'Nintendo']
+
+grouped = df.groupby(by = 'platform')
+total_sum_by_console = grouped['global_sales'].sum()
+total_sales_df = pd.DataFrame({'global_sales': total_sum_by_console})
+
+avg_by_console = grouped['global_sales'].mean()
+avg_df = pd.DataFrame({'avg': avg_by_console})
+
+median = df['global_sales'].median()
+
+def categorize_risk(sales):
+    if sales >= median:
+        return 'low'
+    else:
+        return 'high'
+
+def categorize_decade(year):
+    if str(year // 10)[1] == '9':
+        string = '19'
+        return string + f'{int(year % 100):02d}'[0] + '0\'s'
+    elif str(year // 10)[1] == '0':
+        string = '20'
+        return string + f'{int(year % 100):02d}'[0] + '0\'s'
+
+handhelds = ['GB', 'GBA', 'DS', '3DS']
+family = ['Wii', 'NES', 'SNES', 'N64', 'GC', 'WiiU']
+
+def categorize_platform(platform):
+    if platform in handhelds:
+        return 'handheld'
+    elif platform in family:
+        return 'family'
+
+df['risk'] = df['global_sales'].apply(categorize_risk)
+df['decade'] = df['year'].apply(categorize_decade)
+df['console_type'] = df['platform'].apply(categorize_platform)
+df['na_share'] = df['na_sales'] / df['global_sales']
+df['jp_share'] = df['jp_sales'] / df['global_sales']
+df['eu_share'] = df['eu_sales'] / df['global_sales']
+
+ct = make_column_transformer(
+    (OneHotEncoder(sparse_output = False), ['genre', 'platform', 'console_type', 'decade']),
+    (OrdinalEncoder(), ['risk']),
+    remainder = 'passthrough'
+)
+
+ct.set_output(transform = 'pandas')
+df = ct.fit_transform(df)
+
+for index, column in enumerate(ct.get_feature_names_out()):
+    print(index, column)
+
+trials = []
+
+X = df.iloc[ : , 0:28]
+X = pd.concat([X, df.iloc[ : , 38 : ]], axis = 1)
+y = df['ordinalencoder__risk']
+
+for _ in range(100):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+    rf = RandomForestClassifier(n_estimators = 1000,
+                                criterion = 'entropy',
+                                min_samples_split = 40,
+                                max_depth = 15,
+                                class_weight = 'balanced'
+                                )
+    rf.fit(X_train, y_train)
+
+    feature_importances = dict(zip(X.columns, rf.feature_importances_))
+    feature_importances['score'] = rf.score(X_test, y_test)
+    trials.append(feature_importances)
+
+trial_df = pd.DataFrame(trials)
+
+
+plot = sns.histplot(x = 'score', data = trial_df, bins = 15, color = 'pink', stat = 'proportion')
+plot.set_xlabel('Score')
+plot.set_ylabel('Proportion')
+plot.set_title('Distribution of Model Accuracy Scores')
+
+def title():
     st.title(':rainbow[**:sparkles: Nintendo Video Game Sales :sparkles:**]')
     st.markdown(':stars: :rainbow[Let\'s read in our dataset first] :stars:')
     st.code('''df = pd.read_csv('video_games_sales.csv')
@@ -13,25 +104,15 @@ df = df.dropna()
 df = df[df['publisher'] == 'Nintendo']
 ''')
     
-    df = pd.read_csv('video_games_sales.csv')
-    df = df.dropna()
-
-    df = df[df['publisher'] == 'Nintendo']
-    
     st.dataframe(df)
 
     st.divider()
-    st.header(':dango: :rainbow[Let\'s visualize our data!] :dango:')
 
-    grouped = df.groupby(by = 'platform')
-    total_sum_by_console = grouped['global_sales'].sum()
-    total_sales_df = pd.DataFrame({'global_sales': total_sum_by_console})
+def visualize_data():
+    st.header(':dango: :rainbow[Let\'s visualize our data!] :dango:')
 
     st.markdown(':video_game: :rainbow[Global Sales in Millions by Console] :video_game:')
     st.bar_chart(total_sales_df, x_label = 'Console', y_label = 'Global Sales in Millions', color = '#9A5B5E')
-    
-    avg_by_console = grouped['global_sales'].mean()
-    avg_df = pd.DataFrame({'avg': avg_by_console})
 
     st.markdown(':video_game: :rainbow[Average Sales in Millions by Console] :video_game:')
     st.bar_chart(avg_df, x_label = 'Console', y_label = 'Average Sales in Millions', color = '#9A5B5E')
@@ -45,6 +126,7 @@ df = df[df['publisher'] == 'Nintendo']
 
     st.divider()
 
+def stats_test():
     st.header(':coffee: :rainbow[Statistical Testing!] :coffee:')
     st.subheader(':rainbow-background[Hypothesis Test]')
     st.markdown('Is the difference between the average global sales of the Wii different from the average global sales of the NES?')
@@ -113,6 +195,8 @@ upper_bound = point_estimate + t_star * standard_error''')
     'global sales of Wii games and the average global sales of NES games.')
 
     st.divider()
+
+def insights():
     st.header(':city_sunrise: :rainbow[Insights From Statistical Tests] :city_sunrise:')
     st.markdown('1. We do not have enough evidence to suggest that the mean global sales between the Wii and NES are different.')
     st.markdown('2. In order to maximize profit, Nintendo should look to these systems to evaluate what made them so successful.')
@@ -128,6 +212,8 @@ upper_bound = point_estimate + t_star * standard_error''')
     'grew up to be active consumers, then release "nostalgic" games that are reminiscent of the Wii, ultimately using nostalgia to drive sales')
 
     st.divider()
+
+def preprocessing():
     st.header(':bear: :rainbow[So... What Now? How Do We Determine What to Release to Maximize Sales?] :bear:')
     st.markdown(':high_heel: Let\'s categorize the games in this dataset as "high" risk or "low" risk depending on if they sold above or below the median.' \
     'Games that sold more than the median would be considered low risk whereas games that sold less than the median would be considered' \
@@ -141,16 +227,6 @@ def categorize_risk(sales):
         return 'high'
 
 df['risk'] = df['global_sales'].apply(categorize_risk)''')
- 
-    median = df['global_sales'].median()
-
-    def categorize_risk(sales):
-        if sales >= median:
-            return 'low'
-        else:
-            return 'high'
-
-    df['risk'] = df['global_sales'].apply(categorize_risk)
 
     st.markdown(':revolving_hearts: :rainbow[Let\'s see the new dataset with the risk column added!] :revolving_hearts:')
     st.dataframe(df)
@@ -164,13 +240,6 @@ df['risk'] = df['global_sales'].apply(categorize_risk)''')
         string = '20'
         return string + f'{int(year % 100):02d}'[0] + '0\'s' ''')
 
-    def categorize_decade(year):
-        if str(year // 10)[1] == '9':
-            string = '19'
-            return string + f'{int(year % 100):02d}'[0] + '0\'s'
-        elif str(year // 10)[1] == '0':
-            string = '20'
-            return string + f'{int(year % 100):02d}'[0] + '0\'s'
 
     st.markdown('We can also :rainbow-background[categorize] our platforms as "handheld" or "family."')
     st.code('''handhelds = ['GB', 'GBA', 'DS', '3DS']
@@ -181,26 +250,11 @@ def categorize_platform(platform):
     elif platform in family:
         return 'family' ''')
     
-    handhelds = ['GB', 'GBA', 'DS', '3DS']
-    family = ['Wii', 'NES', 'SNES', 'N64', 'GC', 'WiiU']
-
-    def categorize_platform(platform):
-        if platform in handhelds:
-            return 'handheld'
-        elif platform in family:
-            return 'family'
-    
     st.markdown('To more accurately depict the impact of each region on a game\'s sales, we can take their :rainbow-background[proportion] of each'
     'game\'s sales.')
     st.code('''df['na_share'] = df['na_sales'] / df['global_sales']
 df['jp_share'] = df['jp_sales'] / df['global_sales']
 df['eu_share'] = df['eu_sales'] / df['global_sales']''')
-    
-    df['decade'] = df['year'].apply(categorize_decade)
-    df['console_type'] = df['platform'].apply(categorize_platform)
-    df['na_share'] = df['na_sales'] / df['global_sales']
-    df['jp_share'] = df['jp_sales'] / df['global_sales']
-    df['eu_share'] = df['eu_sales'] / df['global_sales']
     
     st.markdown('Because some of the columns we want to use as labels are categorical, let\'s preprocess these columns'
     ' to make them usable for our machine learning model!')
@@ -214,6 +268,8 @@ ct.set_output(transform = 'pandas')
 df = ct.fit_transform(df)''')
     
     st.divider()
+    
+def model():
     st.header(':evergreen_tree: :rainbow[Building a RandomForestClassifier!] :evergreen_tree:')
     
     st.markdown('Now let\'s create our machine learning model and run 100 trials testing for accuracy so we can get a more'
@@ -240,7 +296,10 @@ for _ in range(100):
 
 trial_df = pd.DataFrame(trials)''')
     
+    
     st.markdown('Let\'s visualize the accuracy scores of all of these trials!')
+    st.dataframe(trial_df)
+    st.pyplot(plot.get_figure())
     
     st.markdown('Let\'s see feature importances!')
     st.code('''accuracies = []
@@ -280,8 +339,11 @@ accuracies''')
  :rainbow[(np.float64(0.23791377835041821), 'remainder__jp_share')],\n
  :rainbow[(np.float64(0.2516844363223184), 'remainder__na_share')],\n
  :red[(np.float64(0.8214285714285714), 'score')]]''')
+
     
     st.divider()
+
+def model_insights():
     st.header(':cherry_blossom: :rainbow[Insights From Our Model] :cherry_blossom:')
     st.markdown('It seems that :rainbow[na_share, jp_share, and eu_share (rainbow text)] are the most important features that carry the model\'s precision.'
     ' However, it is also really interesting to see that many "older" categories, such as the :violet[1980\'s decade (purple text)], ' \
@@ -293,6 +355,8 @@ accuracies''')
     ' pretty "safe" releases in terms of sales and profit, so it would increase the importance of these two genres for the model.')
 
     st.divider()
+
+def final_thoughts():
     st.header(':dart: :rainbow[What EXACTLY Should We Release?] :dart:')
     st.markdown('1. Since North American sales was the most important feature in the machine learning model, perhaps we can cater to North American cultures' \
     ' through easter eggs, unlockables, etc')
@@ -304,8 +368,17 @@ accuracies''')
     st.markdown('For example, say we examine a Mario game from the NES, we can take elements from that game that maybe we scrapped in future '
     'installments and bring them back. This will leverage the stronger features of the 1980\'s decade and the platforming genre.')
 
+def main():
+
+    title()
+    visualize_data()
+    stats_test()
+    insights()
+    preprocessing()
+    model()
+    model_insights()
+    final_thoughts()
 
 
 if __name__ == '__main__':
-
     main()
